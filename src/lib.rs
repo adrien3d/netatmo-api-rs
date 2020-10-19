@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use std::fmt;
+use std::sync::RwLock;
 use serde::{Deserialize};
 
 mod utils;
@@ -24,18 +25,18 @@ pub struct Authentication {
     access_token: String,
     refresh_token: String,
     scope: String,
-    expiration: u32
+    expiration: u64
 }
 
 lazy_static! {
-    static ref LATEST_AUTH: Authentication = Authentication {
-        client_id: "id".to_string(),
-        client_secret: "secret".to_string(),
-        access_token: "access".to_string(),
-        refresh_token: "refresh".to_string(),
+    static ref LATEST_AUTH: RwLock<Authentication> = RwLock::new(Authentication {
+        client_id: "".to_string(),
+        client_secret: "".to_string(),
+        access_token: "".to_string(),
+        refresh_token: "".to_string(),
         scope: "read_station read_camera access_camera write_camera read_presence access_presence write_presence read_thermostat write_thermostat read_smokedetector".to_string(),
         expiration: 0
-    };
+    });
 }
 
 impl Credentials {
@@ -78,8 +79,9 @@ impl fmt::Display for Authentication {
 pub struct ApiResponse {
     access_token: String,
     refresh_token: String,
-    expires_in: u32,
-    expire_in: u32,
+    pub scope: Vec<String>,
+    expires_in: u64,
+    expire_in: u64,
 }
 #[derive(Deserialize)]
 pub struct ApErrorResponse {
@@ -92,7 +94,7 @@ pub fn auth(creds: Credentials) -> Authentication {
     println!("{}", creds);
     let res = client.post("https://api.netatmo.com/oauth2/token")
     //let res = client.post("https://6168d55a9fdffe4faf06f204db674413.m.pipedream.net")
-        .form(&[ ("grant_type", "password"), ("client_id", &creds.client_id), ("client_secret", &creds.client_secret), ("username", &creds.username), ("password", &creds.password), ("scope", &LATEST_AUTH.scope) ])
+        .form(&[ ("grant_type", "password"), ("client_id", &creds.client_id), ("client_secret", &creds.client_secret), ("username", &creds.username), ("password", &creds.password), ("scope", &LATEST_AUTH.read().unwrap().scope) ])
         .send();
 
     match res {
@@ -100,17 +102,22 @@ pub fn auth(creds: Credentials) -> Authentication {
             if res.status() == 200 {
                 println!("Status: {}", res.status());
                 let api_resp: ApiResponse = res.json().unwrap();
-                //LATEST_AUTH.access_token = &mut api_resp.access_token;
-                println!("LATEST_AUTH:{}", LATEST_AUTH.access_token);
+                let mut au = LATEST_AUTH.write().unwrap();
+                au.client_id = creds.client_id.clone();
+                au.client_secret = creds.client_secret.clone();
+                au.access_token = api_resp.access_token.clone();
+                au.refresh_token = api_resp.refresh_token.clone();
+                au.expiration = api_resp.expire_in + utils::get_current_timestamp();
                 let ret_auth = Authentication{ 
-                    client_id: utils::get_empty_string(),
-                    client_secret: utils::get_empty_string(),
+                    client_id: creds.client_id,
+                    client_secret: creds.client_secret,
                     access_token: api_resp.access_token, 
                     refresh_token: api_resp.refresh_token,
-                    scope: utils::get_empty_string(),
-                    expiration: 0
+                    scope: api_resp.scope.join(" "),
+                    expiration: api_resp.expire_in + utils::get_current_timestamp()
                 };
                 println!("ret_auth:{}", ret_auth);
+                println!("LATEST_AUTH:{}", au);
                 return ret_auth;
             } else {
                 println!("Status: {}", res.status());
