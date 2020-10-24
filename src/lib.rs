@@ -1,8 +1,8 @@
 use lazy_static::lazy_static;
 use std::fmt;
 use std::sync::RwLock;
-use serde::{Deserialize};
 
+mod types;
 mod utils;
 
 const ENV_VAR_CLIENT_ID: &str = "NETATMO_CLIENT_ID";
@@ -11,7 +11,9 @@ const ENV_VAR_USERNAME: &str = "NETATMO_USERNAME";
 const ENV_VAR_PASSWORD: &str = "NETATMO_PASSWORD";
 
 const _AUTH_REQ : &str = "https://api.netatmo.com/oauth2/token";
+const _GET_STATIONS_DATA : &str = "https://api.netatmo.com/api/getstationsdata";
 
+#[derive(Clone, Default)]
 pub struct Credentials {
     pub client_id: String,
     pub client_secret: String,
@@ -19,6 +21,7 @@ pub struct Credentials {
     pub password: String
 }
 
+#[derive(Clone, Default)]
 pub struct Authentication { 
     client_id: String,
     client_secret: String,
@@ -26,6 +29,15 @@ pub struct Authentication {
     refresh_token: String,
     scope: String,
     expiration: u64
+}
+
+lazy_static! {
+    static ref CREDENTIALS: RwLock<Credentials> = RwLock::new(Credentials{
+        client_id: "".to_string(),
+        client_secret: "".to_string(),
+        username: "".to_string(),
+        password: "".to_string(),
+    });
 }
 
 lazy_static! {
@@ -41,25 +53,43 @@ lazy_static! {
 
 impl Credentials {
     pub fn from_params(client_id: String, client_secret: String, username: String, password: String) -> Credentials {
-        Credentials { client_id: client_id, client_secret: client_secret, username: username, password: password}
+        let mut cred = CREDENTIALS.write().unwrap();
+        cred.client_id = client_id.clone();
+        cred.client_secret = client_secret.clone();
+        cred.username = username.clone();
+        cred.password = password.clone();
+
+        return Credentials { client_id: client_id, client_secret: client_secret, username: username, password: password};
     }
 
     pub fn from_custom_path(env_client_id_name: String, env_client_secret_name: String, env_username_name: String, env_password_name: String) -> Credentials {
-        Credentials {
+        let mut cred = CREDENTIALS.write().unwrap();
+        cred.client_id = utils::get_var_from_path(&env_client_id_name);
+        cred.client_secret = utils::get_var_from_path(&env_client_secret_name);
+        cred.username = utils::get_var_from_path(&env_username_name);
+        cred.password = utils::get_var_from_path(&env_password_name);
+
+        return Credentials {
             client_id: utils::get_var_from_path(&env_client_id_name),
             client_secret: utils::get_var_from_path(&env_client_secret_name),
             username: utils::get_var_from_path(&env_username_name),
             password: utils::get_var_from_path(&env_password_name),
-        }
+        };
     }
 
     pub fn from_path() -> Credentials {
-        Credentials { 
+        let mut cred = CREDENTIALS.write().unwrap();
+        cred.client_id = utils::get_var_from_path(&ENV_VAR_CLIENT_ID);
+        cred.client_secret = utils::get_var_from_path(&ENV_VAR_CLIENT_SECRET);
+        cred.username = utils::get_var_from_path(&ENV_VAR_USERNAME);
+        cred.password = utils::get_var_from_path(&ENV_VAR_PASSWORD);
+
+        return Credentials {
             client_id: utils::get_var_from_path(&ENV_VAR_CLIENT_ID),
             client_secret: utils::get_var_from_path(&ENV_VAR_CLIENT_SECRET),
             username: utils::get_var_from_path(&ENV_VAR_USERNAME),
             password: utils::get_var_from_path(&ENV_VAR_PASSWORD),
-        }
+        };
     }
 }
 
@@ -75,32 +105,9 @@ impl fmt::Display for Authentication {
     }
 }
 
-#[derive(Deserialize)]
-pub struct ApiResponse {
-    access_token: String,
-    refresh_token: String,
-    pub scope: Vec<String>,
-    //expires_in: u64,
-    expire_in: u64,
-}
-#[derive(Deserialize)]
-pub struct ApErrorResponse {
-    error: String,
-    error_description: String
-}
-
 pub fn auth(creds: Credentials) -> Authentication {
-    let current_auth = LATEST_AUTH.read().unwrap();
     let now = utils::get_current_timestamp();
-
-    let empty_auth: Authentication = Authentication{ 
-        client_id: utils::get_empty_string(),
-        client_secret: utils::get_empty_string(),
-        access_token: utils::get_empty_string(), 
-        refresh_token: utils::get_empty_string(),
-        scope: utils::get_empty_string(),
-        expiration: 0
-    };
+    let current_auth = LATEST_AUTH.read().unwrap();
 
     if current_auth.expiration < now {
         println!("Auth should be renew");
@@ -112,7 +119,7 @@ pub fn auth(creds: Credentials) -> Authentication {
         match res {
             Ok(res) => {
                 if res.status() == 200 {
-                    let api_resp: ApiResponse = res.json().unwrap();
+                    let api_resp: types::AuthApiResponse = res.json().unwrap();
                     std::mem::drop(current_auth);
                     let mut auth = LATEST_AUTH.write().unwrap();
                     auth.client_id = creds.client_id.clone();
@@ -120,7 +127,6 @@ pub fn auth(creds: Credentials) -> Authentication {
                     auth.access_token = api_resp.access_token.clone();
                     auth.refresh_token = api_resp.refresh_token.clone();
                     auth.expiration = api_resp.expire_in + now;
-                    println!("auth set");
                     return Authentication{ 
                         client_id: creds.client_id,
                         client_secret: creds.client_secret,
@@ -131,14 +137,14 @@ pub fn auth(creds: Credentials) -> Authentication {
                     };
                 } else {
                     println!("Status: {}", res.status());
-                    let api_error_resp: ApErrorResponse = res.json().unwrap();
+                    let api_error_resp: types::AuthApiErrorResponse = res.json().unwrap();
                     println!("API error: {} : {}", api_error_resp.error, api_error_resp.error_description);
-                    return empty_auth;
+                    return Authentication::default();
                 }
             },
             Err(err) => {
                 println!("Error: {}", err);
-                return empty_auth;
+                return Authentication::default();
             }
         }
     } else {
@@ -154,7 +160,36 @@ pub fn auth(creds: Credentials) -> Authentication {
     }
 }
 
-pub fn get_stations_data
+pub fn get_stations_data() -> types::ApiResponseStationsRoot {
+    let creds = CREDENTIALS.read().unwrap();
+    let current_auth = auth(Credentials{
+        client_id: creds.client_id.clone(),
+        client_secret: creds.client_secret.clone(),
+        username:creds.username.clone(),
+        password:creds.password.clone()
+    });
+
+    let client = reqwest::blocking::Client::new();
+    let res = client.post(_GET_STATIONS_DATA).form(&[ ("access_token", current_auth.access_token) ]).send();
+
+    match res {
+        Ok(res) => {
+            if res.status() == 200 {
+                let api_resp: types::ApiResponseStationsRoot = res.json().unwrap();
+                return api_resp;
+            } else {
+                println!("Status: {}", res.status());
+                let api_error_resp: types::AuthApiErrorResponse = res.json().unwrap();
+                println!("API error: {} : {}", api_error_resp.error, api_error_resp.error_description);
+                return types::ApiResponseStationsRoot::default();
+            }
+        },
+        Err(err) => {
+            println!("Error: {}", err);
+            return types::ApiResponseStationsRoot::default();
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
