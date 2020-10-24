@@ -10,7 +10,7 @@ const ENV_VAR_CLIENT_SECRET: &str = "NETATMO_CLIENT_SECRET";
 const ENV_VAR_USERNAME: &str = "NETATMO_USERNAME";
 const ENV_VAR_PASSWORD: &str = "NETATMO_PASSWORD";
 
-const BASE_URL: &str = "https://api.netatmo.com/";
+const _AUTH_REQ : &str = "https://api.netatmo.com/oauth2/token";
 
 pub struct Credentials {
     pub client_id: String,
@@ -80,7 +80,7 @@ pub struct ApiResponse {
     access_token: String,
     refresh_token: String,
     pub scope: Vec<String>,
-    expires_in: u64,
+    //expires_in: u64,
     expire_in: u64,
 }
 #[derive(Deserialize)]
@@ -90,62 +90,71 @@ pub struct ApErrorResponse {
 }
 
 pub fn auth(creds: Credentials) -> Authentication {
-    let client = reqwest::blocking::Client::new();
-    println!("{}", creds);
-    let res = client.post("https://api.netatmo.com/oauth2/token")
-    //let res = client.post("https://6168d55a9fdffe4faf06f204db674413.m.pipedream.net")
-        .form(&[ ("grant_type", "password"), ("client_id", &creds.client_id), ("client_secret", &creds.client_secret), ("username", &creds.username), ("password", &creds.password), ("scope", &LATEST_AUTH.read().unwrap().scope) ])
-        .send();
+    let current_auth = LATEST_AUTH.read().unwrap();
+    let now = utils::get_current_timestamp();
 
-    match res {
-        Ok(res) => {
-            if res.status() == 200 {
-                println!("Status: {}", res.status());
-                let api_resp: ApiResponse = res.json().unwrap();
-                let mut au = LATEST_AUTH.write().unwrap();
-                au.client_id = creds.client_id.clone();
-                au.client_secret = creds.client_secret.clone();
-                au.access_token = api_resp.access_token.clone();
-                au.refresh_token = api_resp.refresh_token.clone();
-                au.expiration = api_resp.expire_in + utils::get_current_timestamp();
-                let ret_auth = Authentication{ 
-                    client_id: creds.client_id,
-                    client_secret: creds.client_secret,
-                    access_token: api_resp.access_token, 
-                    refresh_token: api_resp.refresh_token,
-                    scope: api_resp.scope.join(" "),
-                    expiration: api_resp.expire_in + utils::get_current_timestamp()
-                };
-                println!("ret_auth:{}", ret_auth);
-                println!("LATEST_AUTH:{}", au);
-                return ret_auth;
-            } else {
-                println!("Status: {}", res.status());
-                let api_error_resp: ApErrorResponse = res.json().unwrap();
-                println!("API error: {} : {}", api_error_resp.error, api_error_resp.error_description);
-                return Authentication{ 
-                    client_id: utils::get_empty_string(),
-                    client_secret: utils::get_empty_string(),
-                    access_token: utils::get_empty_string(), 
-                    refresh_token: utils::get_empty_string(),
-                    scope: utils::get_empty_string(),
-                    expiration: 0
-                };
+    let empty_auth: Authentication = Authentication{ 
+        client_id: utils::get_empty_string(),
+        client_secret: utils::get_empty_string(),
+        access_token: utils::get_empty_string(), 
+        refresh_token: utils::get_empty_string(),
+        scope: utils::get_empty_string(),
+        expiration: 0
+    };
+
+    if current_auth.expiration < now {
+        println!("Auth should be renew");
+        let client = reqwest::blocking::Client::new();
+        let res = client.post(_AUTH_REQ)
+            .form(&[ ("grant_type", "password"), ("client_id", &creds.client_id), ("client_secret", &creds.client_secret), ("username", &creds.username), ("password", &creds.password), ("scope", &LATEST_AUTH.read().unwrap().scope) ])
+            .send();
+    
+        match res {
+            Ok(res) => {
+                if res.status() == 200 {
+                    let api_resp: ApiResponse = res.json().unwrap();
+                    std::mem::drop(current_auth);
+                    let mut auth = LATEST_AUTH.write().unwrap();
+                    auth.client_id = creds.client_id.clone();
+                    auth.client_secret = creds.client_secret.clone();
+                    auth.access_token = api_resp.access_token.clone();
+                    auth.refresh_token = api_resp.refresh_token.clone();
+                    auth.expiration = api_resp.expire_in + now;
+                    println!("auth set");
+                    return Authentication{ 
+                        client_id: creds.client_id,
+                        client_secret: creds.client_secret,
+                        access_token: api_resp.access_token, 
+                        refresh_token: api_resp.refresh_token,
+                        scope: api_resp.scope.join(" "),
+                        expiration: api_resp.expire_in + now
+                    };
+                } else {
+                    println!("Status: {}", res.status());
+                    let api_error_resp: ApErrorResponse = res.json().unwrap();
+                    println!("API error: {} : {}", api_error_resp.error, api_error_resp.error_description);
+                    return empty_auth;
+                }
+            },
+            Err(err) => {
+                println!("Error: {}", err);
+                return empty_auth;
             }
-        },
-        Err(err) => {
-            println!("Error: {}", err);
-            return Authentication{ 
-                client_id: utils::get_empty_string(),
-                client_secret: utils::get_empty_string(),
-                access_token: utils::get_empty_string(), 
-                refresh_token: utils::get_empty_string(),
-                scope: utils::get_empty_string(),
-                expiration: 0
-            };
         }
+    } else {
+        println!("Auth should not be renew");
+        return Authentication{ 
+            client_id: current_auth.client_id.clone(),
+            client_secret: current_auth.client_secret.clone(),
+            access_token: current_auth.access_token.clone(), 
+            refresh_token: current_auth.refresh_token.clone(),
+            scope: current_auth.scope.clone(),
+            expiration: current_auth.expiration.clone()
+        };
     }
 }
+
+pub fn get_stations_data
 
 #[cfg(test)]
 mod tests {
