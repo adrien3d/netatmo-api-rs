@@ -6,4 +6,4 @@
 
 ### Create a Netatmo App
 * While being connected to your Netatmo account, click [here](https://dev.netatmo.com/apps/).
-* Save your client id and clien secret
+* Save your client id and client secret

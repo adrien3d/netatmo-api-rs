@@ -1,21 +1,6 @@
 use serde::{Deserialize};
 use std::fmt;
 
-#[derive(Clone, Default, Deserialize)]
-pub struct AuthApiResponse {
-    pub access_token: String,
-    pub refresh_token: String,
-    pub scope: Vec<String>,
-    //expires_in: u64,
-    pub expire_in: u64,
-}
-
-#[derive(Clone, Default, Deserialize)]
-pub struct AuthApiErrorResponse {
-    pub error: String,
-    pub error_description: String
-}
-
 pub fn unstack_float_vec(input: Vec<f64>) -> String {
     return input.iter().fold(String::new(), |ac, &el| ac + &el.to_string() + ", ");
 }

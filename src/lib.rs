@@ -160,7 +160,7 @@ pub fn auth(creds: Credentials) -> Authentication {
     }
 }
 
-pub fn get_stations_data() -> types::ApiResponseStationsRoot {
+pub fn get_stations_data() -> types::station::ApiResponseStationsRoot {
     let creds = CREDENTIALS.read().unwrap();
     let current_auth = auth(Credentials{
         client_id: creds.client_id.clone(),
@@ -175,18 +175,18 @@ pub fn get_stations_data() -> types::ApiResponseStationsRoot {
     match res {
         Ok(res) => {
             if res.status() == 200 {
-                let api_resp: types::ApiResponseStationsRoot = res.json().unwrap();
+                let api_resp: types::station::ApiResponseStationsRoot = res.json().unwrap();
                 return api_resp;
             } else {
                 println!("Status: {}", res.status());
                 let api_error_resp: types::AuthApiErrorResponse = res.json().unwrap();
                 println!("API error: {} : {}", api_error_resp.error, api_error_resp.error_description);
-                return types::ApiResponseStationsRoot::default();
+                return types::station::ApiResponseStationsRoot::default();
             }
         },
         Err(err) => {
             println!("Error: {}", err);
-            return types::ApiResponseStationsRoot::default();
+            return types::station::ApiResponseStationsRoot::default();
         }
     }
 }
