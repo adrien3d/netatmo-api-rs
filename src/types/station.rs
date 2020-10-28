@@ -5,7 +5,6 @@ pub fn unstack_float_vec(input: Vec<f64>) -> String {
     return input.iter().fold(String::new(), |ac, &el| ac + &el.to_string() + ", ");
 }
 
-// TODO: define best func
 pub fn unstack_string_api_resp_stations_device(input: Vec<ApiResponseStationsDevice>) -> String {
     return input.iter().fold(String::new(), |ac, el| ac + el.to_string().as_str() + ", ");
 }

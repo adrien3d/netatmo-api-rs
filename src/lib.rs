@@ -191,6 +191,37 @@ pub fn get_stations_data() -> types::station::ApiResponseStationsRoot {
     }
 }
 
+pub fn get_home_data() -> types::home::ApiResponseHomeRoot {
+    let creds = CREDENTIALS.read().unwrap();
+    let current_auth = auth(Credentials{
+        client_id: creds.client_id.clone(),
+        client_secret: creds.client_secret.clone(),
+        username:creds.username.clone(),
+        password:creds.password.clone()
+    });
+
+    let client = reqwest::blocking::Client::new();
+    let res = client.post(_GET_STATIONS_DATA).form(&[ ("access_token", current_auth.access_token) ]).send();
+
+    match res {
+        Ok(res) => {
+            if res.status() == 200 {
+                let api_resp: types::home::ApiResponseHomeRoot = res.json().unwrap();
+                return api_resp;
+            } else {
+                println!("Status: {}", res.status());
+                let api_error_resp: types::AuthApiErrorResponse = res.json().unwrap();
+                println!("API error: {} : {}", api_error_resp.error, api_error_resp.error_description);
+                return types::home::ApiResponseHomeRoot::default();
+            }
+        },
+        Err(err) => {
+            println!("Error: {}", err);
+            return types::home::ApiResponseHomeRoot::default();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
