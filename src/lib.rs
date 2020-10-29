@@ -12,6 +12,7 @@ const ENV_VAR_PASSWORD: &str = "NETATMO_PASSWORD";
 
 const _AUTH_REQ : &str = "https://api.netatmo.com/oauth2/token";
 const _GET_STATIONS_DATA : &str = "https://api.netatmo.com/api/getstationsdata";
+const _GET_HOME_DATA : &str = "https://api.netatmo.com/api/gethomedata";
 
 #[derive(Clone, Default)]
 pub struct Credentials {
@@ -201,7 +202,7 @@ pub fn get_home_data() -> types::home::ApiResponseHomeRoot {
     });
 
     let client = reqwest::blocking::Client::new();
-    let res = client.post(_GET_STATIONS_DATA).form(&[ ("access_token", current_auth.access_token) ]).send();
+    let res = client.post(_GET_HOME_DATA).form(&[ ("access_token", current_auth.access_token) ]).send();
 
     match res {
         Ok(res) => {
