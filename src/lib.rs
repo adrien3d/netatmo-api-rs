@@ -34,19 +34,19 @@ pub struct Authentication {
 
 lazy_static! {
     static ref CREDENTIALS: RwLock<Credentials> = RwLock::new(Credentials{
-        client_id: "".to_string(),
-        client_secret: "".to_string(),
-        username: "".to_string(),
-        password: "".to_string(),
+        client_id: String::from(""),
+        client_secret: String::from(""),
+        username: String::from(""),
+        password: String::from(""),
     });
 }
 
 lazy_static! {
     static ref LATEST_AUTH: RwLock<Authentication> = RwLock::new(Authentication {
-        client_id: "".to_string(),
-        client_secret: "".to_string(),
-        access_token: "".to_string(),
-        refresh_token: "".to_string(),
+        client_id: String::from(""),
+        client_secret: String::from(""),
+        access_token: String::from(""),
+        refresh_token: String::from(""),
         scope: "read_station read_camera access_camera write_camera read_presence access_presence write_presence read_thermostat write_thermostat read_smokedetector".to_string(),
         expiration: 0
     });
