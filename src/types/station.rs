@@ -46,7 +46,7 @@ impl fmt::Display for ApiResponseStationsPlace {
 
 impl fmt::Display for ApiResponseStationsMainData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ApiResponseStationsMainData: time_utc:{}\t temperature:{}\t co2:{}\t humidity:{}\t noise:{}\t pressure:{}\t absolute_pressure:{}\t min_temp:{}\t max_temp:{}\t date_min_temp:{}\t date_max_temp:{}\t temp_trend:{}\t pressure_trend:{}", 
+        write!(f, "ApiResponseStationsMainData: time_utc:{}\t temperature:{}\t co2:{}\t humidity:{}\t noise:{}\t pressure:{}\t absolute_pressure:{}\t min_temp:{}\t max_temp:{}\t date_min_temp:{}\t date_max_temp:{}\t temp_trend:{}\t pressure_trend:{:?}",
         self.time_utc, self.temperature, self.co2, self.humidity, self.noise, self.pressure, self.absolute_pressure, self.min_temp, self.max_temp, self.date_min_temp, self.date_max_temp, self.temp_trend, self.pressure_trend)
     }
 }
@@ -138,7 +138,7 @@ pub struct ApiResponseStationsMainData {
     pub date_min_temp: i64,
     pub date_max_temp: i64,
     pub temp_trend: String,
-    pub pressure_trend: String,
+    pub pressure_trend: Option<String>,
 }
 
 #[derive(Clone, Default, Deserialize)]
